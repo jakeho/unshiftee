@@ -32,6 +32,12 @@ The **Check Interval** menu offers 5, 15, 30, or 60 minutes. The default is 5 mi
 
 Quit from the menu or press `Command–Q` while Unshiftee's menu is active.
 
+## Disclaimer
+
+Unshiftee asks you to acknowledge its disclaimer before the monitor and global shortcut start. You can read it again from **Disclaimer…** in the menu-bar menu.
+
+You remain responsible for authorization, workplace policy, overtime approval and reporting, security requirements, and applicable law. Read [DISCLAIMER.md](DISCLAIMER.md) before using or distributing the app.
+
 ## How it works
 
 Shiftee Desktop currently restores its own `openAtLogin` setting when it launches. macOS does not provide a normal per-app deny list for that API, so Unshiftee is a small cleanup monitor rather than a permanent policy block.

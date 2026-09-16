@@ -2,6 +2,21 @@ import AppKit
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+  private enum Disclaimer {
+    static let acceptanceKey = "acceptedDisclaimerVersion"
+    static let currentVersion = 1
+    static let title = "Use Unshiftee at Your Own Risk"
+    static let summary = """
+      Unshiftee removes the Shiftee Desktop login item and can force-terminate its process.
+
+      You must follow applicable law, workplace rules, overtime approval and reporting requirements, security policies, and employment agreements. Use Unshiftee only on devices and accounts you have authority to control.
+
+      You choose whether to use Unshiftee and bear responsibility for that choice and its consequences. The software comes “as is,” without warranties. To the maximum extent permitted by law, the author and contributors disclaim liability for claims, loss, damage, employment action, lost data, or other consequences connected with its use.
+
+      This notice does not provide legal advice.
+      """
+  }
+
   private enum CheckInterval: Int, CaseIterable {
     case fiveMinutes = 300
     case fifteenMinutes = 900
@@ -50,6 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     NSApp.setActivationPolicy(.accessory)
     configureMainMenu()
     configureStatusItem()
+
+    guard requireDisclaimerAcceptance() else {
+      NSApp.terminate(nil)
+      return
+    }
 
     monitor.setResultHandler { [weak self] result in
       DispatchQueue.main.async {
@@ -185,6 +205,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
     aboutItem.target = self
     menu.addItem(aboutItem)
+
+    let disclaimerItem = NSMenuItem(
+      title: "Disclaimer…",
+      action: #selector(showDisclaimer),
+      keyEquivalent: ""
+    )
+    disclaimerItem.target = self
+    menu.addItem(disclaimerItem)
     menu.addItem(.separator())
 
     let quitItem = NSMenuItem(
@@ -260,6 +288,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   @objc private func showAbout() {
     NSApp.activate(ignoringOtherApps: true)
     NSApp.orderFrontStandardAboutPanel(nil)
+  }
+
+  @objc private func showDisclaimer() {
+    let alert = makeDisclaimerAlert()
+    alert.addButton(withTitle: "Close")
+    alert.addButton(withTitle: "Open Full Disclaimer")
+
+    if alert.runModal() == .alertSecondButtonReturn {
+      openFullDisclaimer()
+    }
+  }
+
+  private func requireDisclaimerAcceptance() -> Bool {
+    let acceptedVersion = UserDefaults.standard.integer(forKey: Disclaimer.acceptanceKey)
+    guard acceptedVersion < Disclaimer.currentVersion else { return true }
+
+    while true {
+      let alert = makeDisclaimerAlert()
+      alert.addButton(withTitle: "I Understand")
+      alert.addButton(withTitle: "Quit")
+      alert.addButton(withTitle: "Read Full Disclaimer")
+
+      switch alert.runModal() {
+      case .alertFirstButtonReturn:
+        UserDefaults.standard.set(
+          Disclaimer.currentVersion,
+          forKey: Disclaimer.acceptanceKey
+        )
+        return true
+      case .alertThirdButtonReturn:
+        openFullDisclaimer()
+      default:
+        return false
+      }
+    }
+  }
+
+  private func makeDisclaimerAlert() -> NSAlert {
+    NSApp.activate(ignoringOtherApps: true)
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = Disclaimer.title
+    alert.informativeText = Disclaimer.summary
+    return alert
+  }
+
+  private func openFullDisclaimer() {
+    guard let url = Bundle.main.url(forResource: "DISCLAIMER", withExtension: "md") else {
+      showError(
+        title: "Disclaimer Not Found",
+        message: "The application bundle does not contain DISCLAIMER.md."
+      )
+      return
+    }
+
+    NSWorkspace.shared.open(url)
   }
 
   private func refreshLaunchAtLoginItem() {

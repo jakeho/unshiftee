@@ -29,6 +29,7 @@ mkdir -p "$destination/Contents/MacOS" "$destination/Contents/Resources"
 /usr/bin/ditto "$binary_directory/Unshiftee" "$destination/Contents/MacOS/Unshiftee"
 /usr/bin/ditto "$repo_root/Resources/Info.plist" "$destination/Contents/Info.plist"
 /usr/bin/ditto "$repo_root/Resources/AppIcon.icns" "$destination/Contents/Resources/AppIcon.icns"
+/usr/bin/ditto "$repo_root/DISCLAIMER.md" "$destination/Contents/Resources/DISCLAIMER.md"
 /usr/bin/codesign --force --deep --sign - "$destination"
 
 print "Built $destination"
