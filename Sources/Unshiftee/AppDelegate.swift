@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   }
 
   private enum CheckInterval: Int, CaseIterable {
+    case off = 0
     case fiveMinutes = 300
     case fifteenMinutes = 900
     case thirtyMinutes = 1_800
@@ -26,27 +27,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     static let defaultsKey = "checkIntervalSeconds"
 
     static var saved: CheckInterval {
-      let seconds = UserDefaults.standard.integer(forKey: defaultsKey)
-      return CheckInterval(rawValue: seconds) ?? .fiveMinutes
+      let defaults = UserDefaults.standard
+      guard defaults.object(forKey: defaultsKey) != nil else { return .off }
+
+      let seconds = defaults.integer(forKey: defaultsKey)
+      return CheckInterval(rawValue: seconds) ?? .off
     }
 
     var title: String {
       switch self {
+      case .off:
+        return "Off"
       case .fiveMinutes:
-        return "5 Minutes"
+        return "Every 5 Minutes"
       case .fifteenMinutes:
-        return "15 Minutes"
+        return "Every 15 Minutes"
       case .thirtyMinutes:
-        return "30 Minutes"
+        return "Every 30 Minutes"
       case .oneHour:
-        return "1 Hour"
+        return "Every Hour"
       }
+    }
+
+    var seconds: Int? {
+      self == .off ? nil : rawValue
     }
   }
 
   private var checkInterval = CheckInterval.saved
   private lazy var monitor = LoginItemMonitor(
-    interval: .seconds(checkInterval.rawValue)
+    interval: .seconds(checkInterval.seconds ?? CheckInterval.fiveMinutes.rawValue)
   )
   private let hotKeyManager = HotKeyManager()
   private let timeFormatter: DateFormatter = {
@@ -85,7 +95,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       setStatus("Hot key unavailable: \(error.localizedDescription)")
     }
 
-    monitor.start()
+    if checkInterval == .off {
+      setStatus("Automatic checks are off")
+    } else {
+      monitor.start()
+    }
   }
 
   func applicationWillTerminate(_ notification: Notification) {
@@ -136,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let menu = NSMenu()
     menu.delegate = self
 
-    let headingItem = NSMenuItem(title: "Unshiftee is watching", action: nil, keyEquivalent: "")
+    let headingItem = NSMenuItem(title: "Unshiftee", action: nil, keyEquivalent: "")
     headingItem.isEnabled = false
     menu.addItem(headingItem)
 
@@ -153,12 +167,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     checkItem.target = self
     menu.addItem(checkItem)
 
-    let checkIntervalItem = NSMenuItem(
-      title: "Check Interval",
+    let automaticChecksItem = NSMenuItem(
+      title: "Automatic Checks",
       action: nil,
       keyEquivalent: ""
     )
-    let checkIntervalMenu = NSMenu()
+    let automaticChecksMenu = NSMenu()
     for interval in CheckInterval.allCases {
       let item = NSMenuItem(
         title: interval.title,
@@ -167,11 +181,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
       )
       item.target = self
       item.tag = interval.rawValue
-      checkIntervalMenu.addItem(item)
+      automaticChecksMenu.addItem(item)
       checkIntervalMenuItems[interval] = item
     }
-    checkIntervalItem.submenu = checkIntervalMenu
-    menu.addItem(checkIntervalItem)
+    automaticChecksItem.submenu = automaticChecksMenu
+    menu.addItem(automaticChecksItem)
 
     let terminateItem = NSMenuItem(
       title: "Terminate Shiftee Now",
@@ -239,11 +253,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   @objc private func setCheckInterval(_ sender: NSMenuItem) {
     guard let interval = CheckInterval(rawValue: sender.tag) else { return }
 
+    let automaticChecksWereOff = checkInterval == .off
     checkInterval = interval
     UserDefaults.standard.set(interval.rawValue, forKey: CheckInterval.defaultsKey)
-    monitor.setInterval(.seconds(interval.rawValue))
+
+    if let seconds = interval.seconds {
+      monitor.setInterval(.seconds(seconds))
+      if automaticChecksWereOff {
+        monitor.start()
+      }
+      setStatus("Checking \(interval.title.lowercased())")
+    } else {
+      monitor.stop()
+      setStatus("Automatic checks are off")
+    }
+
     refreshCheckIntervalItems()
-    setStatus("Checking every \(interval.title.lowercased())")
   }
 
   @objc private func terminateShiftee() {
